@@ -19,8 +19,8 @@ Licensed under a 3-clause BSD license. See the LICENSE file for more information
 
 #define CURRENT_FORMAT_VERSION 100
 
-// grab scoped_ptr from assimp to avoid a dependency on boost. 
-#include <assimp/../../code/BoostWorkaround/boost/scoped_ptr.hpp>
+#include <memory>
+
 
 #include "mesh_splitter.h"
 
@@ -822,7 +822,7 @@ void Write(JSONWriter& out, const aiScene& ai)
 
 void Assimp2Json(const char* file, Assimp::IOSystem* io, const aiScene* scene, const Assimp::ExportProperties*) 
 {
-	boost::scoped_ptr<Assimp::IOStream> str(io->Open(file,"wt"));
+	std::unique_ptr<Assimp::IOStream> str(io->Open(file,"wt"));
 	if(!str) {
 		//throw Assimp::DeadlyExportError("could not open output file");
 	}

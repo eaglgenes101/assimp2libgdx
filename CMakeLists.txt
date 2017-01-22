@@ -1,5 +1,7 @@
 cmake_minimum_required (VERSION 2.6)
 project (assimp2json)
+set(CMAKE_CXX_FLAGS "-std=c++11")
+
 
 # The version number.
 set (ASSIMP2JSON_VERSION_MAJOR 2)

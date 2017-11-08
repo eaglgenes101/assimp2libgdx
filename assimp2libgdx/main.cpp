@@ -14,6 +14,7 @@ Licensed under a 3-clause BSD license. See the LICENSE file for more information
 #include <assimp/scene.h>
 
 #include <iostream>
+#include <cassert>
 
 #include "version.h"
 
@@ -70,11 +71,6 @@ int main (int argc, char *argv[])
 	
 	Assimp::Importer imp;
 
-	// instruct aiProcess_FindDegenerates to drop degenerates 
-	imp.SetPropertyBool(AI_CONFIG_PP_FD_REMOVE, true);
-	// instruct aiProcess_SortByPrimitiveType to drop line and point meshes
-	imp.SetPropertyInteger(AI_CONFIG_PP_SBP_REMOVE, aiPrimitiveType_POINT | aiPrimitiveType_LINE);
-
 	// instruct aiProcess_GenSmoothNormals to not smooth normals with an angle of more than 70deg
 	imp.SetPropertyFloat(AI_CONFIG_PP_GSN_MAX_SMOOTHING_ANGLE, 70.0f);
 	// instruct aiProcess_CalcTangents to not smooth normals with an angle of more than 70deg
@@ -87,18 +83,19 @@ int main (int argc, char *argv[])
 	}
 
 	Assimp::Exporter exp;
-	exp.RegisterExporter(Assimp2Libgdx_desc);
+	aiReturn checkReturn = exp.RegisterExporter(Assimp2Libgdx_desc);
+	assert(checkReturn == aiReturn_SUCCESS);
 
 	if(out) {
-		if(aiReturn_SUCCESS != exp.Export(sc,"assimp.json",out)) {
+		if(aiReturn_SUCCESS != exp.Export(sc,"g3dj",out)) {
 			std::cerr << "failure exporting file: " << out << ": " << exp.GetErrorString() << std::endl;
 			return -4;
 		}
 	}
 	else {
 		// write to stdout, but we might do better than using ExportToBlob()
-		const aiExportDataBlob* const blob = exp.ExportToBlob(sc,"assimp.json");
-		if(!blob) {
+		const aiExportDataBlob* const blob = exp.ExportToBlob(sc,"g3dj");
+		if(blob == nullptr) {
 			std::cerr << "failure exporting to (stdout) " << exp.GetErrorString() << std::endl;
 			return -5;
 		}

@@ -20,6 +20,7 @@ Licensed under a 3-clause BSD license. See the LICENSE file for more information
 #include <assimp/scene.h>
 
 #include <sstream>
+#include <iostream>
 #include <limits>
 #include <cassert>
 #include <cstring>
@@ -31,19 +32,14 @@ Licensed under a 3-clause BSD license. See the LICENSE file for more information
 
 #include "mesh_splitter.h"
 
-
-extern "C" {
-#include "cencode.h"
-}
-
 namespace {
 void Assimp2Libgdx(const char*, Assimp::IOSystem*, const aiScene*, const Assimp::ExportProperties*);
 }
 
 Assimp::Exporter::ExportFormatEntry Assimp2Libgdx_desc = Assimp::Exporter::ExportFormatEntry(
-	"assimp.g3dj",
-	"LibGDX 3D Json format",
-	"assimp.g3dj",
+	"g3dj",
+	"LibGDX 3D Format (json)",
+	"g3dj",
 	Assimp2Libgdx,
 	0u);
 
@@ -63,10 +59,11 @@ public:
 
 public:
 
-	JSONWriter(Assimp::IOStream& out, unsigned int flags = 0u) : out(out), first(), flags(flags)
+	JSONWriter(Assimp::IOStream& out, unsigned int flags = 0u) : out(out), flags(flags)
 	{
 		// make sure that all formatting happens using the standard, C locale and not the user's current locale
 		buff.imbue( std::locale("C") );
+		first = true;
 		doDelimit = true;
 	}
 
@@ -92,8 +89,9 @@ public:
 	}
 
 	void Key(const std::string& name) {
-		AddIndentation();
 		Delimit();
+		NewLine();
+		AddIndentation();
 		doDelimit = false;
 		buff << '\"'+name+"\": ";
 	}
@@ -102,72 +100,51 @@ public:
 	void SimpleValue(const Literal& s) {
 		if (doDelimit) {
 			Delimit();
+			NewLine();
 			AddIndentation();
 		}
 		doDelimit = true;
-		LiteralToString(buff, s) << '\n';
+		LiteralToString(buff, s);
 	}
-
-	void SimpleValue(const void* buffer, size_t len) {
-		if (doDelimit) {
-			Delimit();
-			AddIndentation();
-		}
-		doDelimit = true;
-		
-		base64_encodestate s;
-		base64_init_encodestate(&s);
-
-		char* const out = new char[std::max(len*2, static_cast<size_t>(16u))];
-		const int n = base64_encode_block(reinterpret_cast<const char*>( buffer ), static_cast<int>( len ),out,&s);
-		out[n+base64_encode_blockend(out + n,&s)] = '\0';
-
-		// base64 encoding may add newlines, but JSON strings may not contain 'real' newlines
-		// (only escaped ones). Remove any newlines in out.
-		for(char* cur = out; *cur; ++cur) {
-			if(*cur == '\n') {
-				*cur = ' ';
-			}
-		}
-
-		buff << '\"' << out << "\"\n";
-		delete[] out;
-	} 
 
 	void StartObj() {
 		if (doDelimit) {
-			AddIndentation();
 			Delimit();
+			NewLine();
+			AddIndentation();
 		}
 		doDelimit = true;
 		first = true;
-		buff << "{\n";
+		buff << "{";
 		PushIndent();
 	}
 
 	void EndObj() {
 		PopIndent();
+		NewLine();
 		AddIndentation();
 		doDelimit = true;
 		first = false;
-		buff << "}\n";
+		buff << "}";
 	}
 
 	void StartArray() {
 		if (doDelimit) {
-			AddIndentation();
 			Delimit();
+			NewLine();
+			AddIndentation();
 		}
 		doDelimit = true;
 		first = true;
-		buff << "[\n";
+		buff << "[";
 		PushIndent();
 	}
 
 	void EndArray() {
 		PopIndent();
+		NewLine();
 		AddIndentation();
-		buff << "]\n";
+		buff << "]";
 		doDelimit = true;
 		first = false;
 	}
@@ -176,6 +153,10 @@ public:
 		if(!(flags & Flag_DoNotIndent)) {
 			buff << indent;
 		}
+	}
+	
+	void NewLine() {
+		buff << std::endl;
 	}
 
 	void Delimit() {
@@ -190,17 +171,68 @@ public:
 
 private:
 
+	//To prevent errors, the generic version is not enabled
+	//Use one of the specializations instead
+	/*
 	template<typename Literal>
 	std::stringstream& LiteralToString(std::stringstream& stream, const Literal& s) {
 		stream << s;
 		return stream;
 	}
+	*/
+	
+	std::stringstream& LiteralToString(std::stringstream& stream, const int& s) {
+		stream << s;
+		return stream;
+	}
+	
+	std::stringstream& LiteralToString(std::stringstream& stream, const unsigned int& s) {
+		stream << s;
+		return stream;
+	}
+	
+	std::stringstream& LiteralToString(std::stringstream& stream, const std::string& s) {
+		std::string t;
+		// escape backslashes and single quotes, both would render the JSON invalid if left as is
+		//t.reserve(s.size()); //BZZZZZT
+		for(unsigned int i = 0; i < s.size(); i++) {
+			
+			if (s[i] == '\\' || s[i] == '\'' || s[i] == '\"') {
+				t.push_back('\\');
+			}
 
-	std::stringstream& LiteralToString(std::stringstream& stream, const aiString& s) {
+			t.push_back(s[i]);
+		}
+		stream << "\"";
+		stream << t;
+		stream << "\"";
+		return stream;
+	}
+
+	std::stringstream& LiteralToString(std::stringstream& stream, const char* s) {
 		std::string t;
 
 		// escape backslashes and single quotes, both would render the JSON invalid if left as is
-		t.reserve(s.length);
+		//t.reserve(strlen(s)); //BZZZZZT
+		for(const char* i = s; *i != '\0'; i++) {
+			
+			if (*i == '\\' || *i == '\'' || *i == '\"') {
+				t.push_back('\\');
+			}
+
+			t.push_back(*i);
+		}
+		stream << "\"";
+		stream << t;
+		stream << "\"";
+		return stream;
+	}
+
+	/*
+	std::stringstream& LiteralToString(std::stringstream& stream, const aiString& s) {
+		std::string t;
+		// escape backslashes and single quotes, both would render the JSON invalid if left as is
+		//t.reserve(s.length); //BZZZZZT
 		for(size_t i = 0; i < s.length; ++i) {
 			
 			if (s.data[i] == '\\' || s.data[i] == '\'' || s.data[i] == '\"') {
@@ -214,15 +246,16 @@ private:
 		stream << "\"";
 		return stream;
 	}
+	*/
 
-	std::stringstream& LiteralToString(std::stringstream& stream, float f) {
+	std::stringstream& LiteralToString(std::stringstream& stream, const float& f) {
 		if (!std::numeric_limits<float>::is_iec559) {
 			// on a non IEEE-754 platform, we make no assumptions about the representation or existence
 			// of special floating-point numbers. 
 			stream << f;
 			return stream;
 		}
-
+		/*
 		// JSON does not support writing Inf/Nan
 		// [RFC 4672: "Numeric values that cannot be represented as sequences of digits
 		// (such as Infinity and NaN) are not permitted."]
@@ -248,7 +281,7 @@ private:
 			stream << "0.0";
 			return stream;
 		}
-
+		*/
 		stream << f;
 		return stream;
 	}
@@ -297,7 +330,7 @@ void Write(JSONWriter& out, const aiBone& ai)
 	//...I think
 	//Or is it the node ID that should be here? 
 	out.Key("node");
-	out.SimpleValue(ai.mName); 
+	out.SimpleValue(ai.mName.C_Str()); 
 	
 	aiMatrix4x4 transform = ai.mOffsetMatrix;
 	//Decompose
@@ -400,7 +433,7 @@ void Write(JSONWriter& out, const aiMesh& ai)
 		out.StartObj();
 		out.Key("id");
 		//Name takes the form <meshName> "." <faceNum>
-		out.SimpleValue(std::string(ai.mName.C_Str())+"."+std::to_string(i)); 
+		out.SimpleValue(std::string(ai.mName.C_Str())+std::string(".")+std::to_string(i)); 
 		out.Key("type");
 		switch(ai.mFaces[i].mNumIndices)
 		{
@@ -431,18 +464,27 @@ void WriteAsPart(JSONWriter& out, const aiMesh& ai, int id)
 	out.StartObj();
 	out.Key("meshpartid");
 	//Name takes the form <meshName> "." <faceNum>
-	out.SimpleValue(std::string(ai.mName.C_Str())+"."+std::to_string(id)); 
+	out.SimpleValue(std::string(ai.mName.C_Str())+std::string(".")+std::to_string(id));
 	out.Key("materialid");
 	out.SimpleValue(ai.mMaterialIndex);
-	if (ai.mNumBones) {
+	if (ai.HasBones()) {
+		assert(ai.mNumBones > 0);
+		assert(ai.mBones != nullptr);
+		//For w/e reason, I can't do the double indirection of aiMesh to aiBone
+		//The below line segfaults, even though it should be valid if bones exist in the mesh
+		//assert(*ai.mBones != nullptr); 
+		
+		//TODO: Figure out how to access bones without segfaulting
 		out.Key("bones");
 		out.StartArray();
 		for (unsigned int i = 0; i < ai.mNumBones; ++i) {
-			Write(out, *ai.mBones[i]);
+			//Write(out, *ai.mBones[i] ); //According to what I can gather, this should do the trick
 		}
 		out.EndArray();
 	}
 	if (ai.GetNumUVChannels()) {
+		//TODO: Figure out how to access UV maps without segfaulting
+		
 		out.Key("uvMapping");
 		out.StartArray();
 		for (unsigned int channel = 0; channel < ai.GetNumUVChannels(); ++channel) {
@@ -450,11 +492,12 @@ void WriteAsPart(JSONWriter& out, const aiMesh& ai, int id)
 			for (unsigned int component = 0; component < ai.mNumUVComponents[channel]; ++component) {
 				//The spec isn't entirely clear, so this is my best guess
 				//It spills the vector coordinates into one homogenous array
-				Write(out, (ai.mTextureCoords[channel])[component]); 
+				//Write(out, ai.mTextureCoords[channel][component]); 
 			}
 			out.EndArray();
 		}
 		out.EndArray();
+		
 	}
 
 	out.EndObj();
@@ -466,7 +509,7 @@ void Write(JSONWriter& out, const aiNode& ai, aiMesh* meshes)
 	out.StartObj();
 
 	out.Key("name");
-	out.SimpleValue(ai.mName);
+	out.SimpleValue(ai.mName.C_Str());
 	
 	aiMatrix4x4 transform = ai.mTransformation;
 	//Decompose
@@ -512,21 +555,20 @@ std::array<aiString*, 4> Write(JSONWriter& out, const aiMaterial& ai, int d)
 {
 	aiString* val[4];
 	out.Key("id");
-	out.SimpleValue(std::to_string(d).c_str());
+	out.SimpleValue(std::to_string(d));
 	//Stuff to defer until later
 	bool doBlend = false;
 	float opacity = 1.0;
-	const char* srcBlend = NULL;
-	const char* destBlend = NULL;
+	const char* srcBlend = nullptr;
+	const char* destBlend = nullptr;
 	int diffuseDepth = -1;
-	aiString* diffusePath = NULL;
+	aiString* diffusePath = nullptr;
 	int specularDepth = -1;
-	aiString* specularPath = NULL;
+	aiString* specularPath = nullptr;
 	int bumpDepth = -1;
-	aiString* bumpPath = NULL;
+	aiString* bumpPath = nullptr;
 	int normalDepth = -1;
-	aiString* normalPath = NULL;
-	out.StartObj();
+	aiString* normalPath = nullptr;
 	for (unsigned int i = 0; i < ai.mNumProperties; i++) {
 		const aiMaterialProperty* prop = ai.mProperties[i];
 		//Took me forever to figure out what was going on before finding that 
@@ -650,12 +692,12 @@ std::array<aiString*, 4> Write(JSONWriter& out, const aiMaterial& ai, int d)
 		out.StartObj();
 		out.Key("opacity");
 		out.SimpleValue(opacity);
-		if (srcBlend != NULL) 
+		if (srcBlend != nullptr) 
 		{
 			out.Key("source");
 			out.SimpleValue(srcBlend);
 		}
-		if (destBlend != NULL)
+		if (destBlend != nullptr)
 		{
 			out.Key("destination");
 			out.SimpleValue(destBlend);
@@ -665,28 +707,39 @@ std::array<aiString*, 4> Write(JSONWriter& out, const aiMaterial& ai, int d)
 	if (diffuseDepth >= 0)
 	{
 		out.Key("diffuseTexture");
-		out.SimpleValue(diffusePath);
+		assert(diffusePath != nullptr);
+		out.SimpleValue(diffusePath->C_Str());
 		val[0] = diffusePath;
 	}
+	else
+		val[0] = nullptr;
 	if (specularDepth >= 0)
 	{
 		out.Key("specularTexture");
-		out.SimpleValue(specularPath);
+		assert(specularPath != nullptr);
+		out.SimpleValue(specularPath->C_Str());
 		val[1] = specularPath;
 	}
+	else
+		val[1] = nullptr;
 	if (bumpDepth >= 0)
 	{
 		out.Key("bumpTexture");
-		out.SimpleValue(bumpPath);
+		assert(bumpPath != nullptr);
+		out.SimpleValue(bumpPath->C_Str());
 		val[2] = bumpPath;
 	}
+	else
+		val[2] = nullptr;
 	if (normalDepth >= 0)
 	{
 		out.Key("normalTexture");
-		out.SimpleValue(normalPath);
+		assert(normalPath != nullptr);
+		out.SimpleValue(normalPath->C_Str());
 		val[3] = normalPath;
 	}
-	out.EndObj();
+	else
+		val[3] = nullptr;
 	return {val[0], val[1], val[2], val[3]};
 }
 
@@ -695,7 +748,7 @@ void Write(JSONWriter& out, const aiNodeAnim& ai)
 	out.StartObj();
 	
 	out.Key("node");
-	out.SimpleValue(ai.mNodeName);
+	out.SimpleValue(ai.mNodeName.C_Str());
 	
 	std::map<float, aiVector3D> posKeys;
 	std::map<float, aiQuaternion> rotKeys;
@@ -778,7 +831,7 @@ void Write(JSONWriter& out, const aiAnimation& ai)
 	out.StartObj();
 
 	out.Key("id");
-	out.SimpleValue(ai.mName);
+	out.SimpleValue(ai.mName.C_Str());
 	
 	//TODO: Figure out what to do for mesh animations
 	
@@ -826,13 +879,11 @@ void Write(JSONWriter& out, const aiScene& ai)
 		out.StartArray();
 		for(unsigned int n = 0; n < ai.mNumMaterials; ++n) {
 			out.StartObj();
-			out.Key("id");
-			out.SimpleValue(n);
 			std::array<aiString*, 4> values = Write(out,*ai.mMaterials[n],n);
-			if (values[0] != NULL) materialNames.insert(values[0]);
-			if (values[1] != NULL) materialNames.insert(values[1]);
-			if (values[2] != NULL) materialNames.insert(values[2]);
-			if (values[3] != NULL) materialNames.insert(values[3]);
+			if (values[0] != nullptr) materialNames.insert(values[0]);
+			if (values[1] != nullptr) materialNames.insert(values[1]);
+			if (values[2] != nullptr) materialNames.insert(values[2]);
+			if (values[3] != nullptr) materialNames.insert(values[3]);
 			out.EndObj();
 		}
 		out.EndArray();
@@ -842,13 +893,13 @@ void Write(JSONWriter& out, const aiScene& ai)
 		std::set<aiString*>::iterator iter = materialNames.begin();
 		for (unsigned int i = 0; i < materialNames.size(); i++) {
 			aiString* str = *iter++;
+			assert(str != nullptr);
 			out.StartObj();
-			std::string name(str->C_Str());
 			//Assign by index
 			out.Key("id");
 			out.SimpleValue(i);
 			out.Key("filename");
-			out.SimpleValue(name);
+			out.SimpleValue(str->C_Str());
 		}
 		out.EndArray();
 	}
@@ -874,10 +925,8 @@ void Write(JSONWriter& out, const aiScene& ai)
 void Assimp2Libgdx(const char* file, Assimp::IOSystem* io, const aiScene* scene, const Assimp::ExportProperties*) 
 {
 	std::unique_ptr<Assimp::IOStream> str(io->Open(file,"wt"));
-	if(!str) {
-		//throw Assimp::DeadlyExportError("could not open output file");
-	}
-
+	assert(str != nullptr);
+	
 	// get a copy of the scene so we can modify it
 	aiScene* scenecopy_tmp;
 	aiCopyScene(scene, &scenecopy_tmp);
@@ -887,13 +936,13 @@ void Assimp2Libgdx(const char* file, Assimp::IOSystem* io, const aiScene* scene,
 		MeshSplitter splitter;
 		splitter.SetLimit(1 << 16);
 		splitter.Execute(scenecopy_tmp);
-
+		
 		// XXX Flag_WriteSpecialFloats is turned on by default, right now we don't have a configuration interface for exporters
 		JSONWriter s(*str,JSONWriter::Flag_WriteSpecialFloats);
 		Write(s,*scenecopy_tmp);
-
 	}
-	catch(...) {
+	catch(const std::exception &exc) {
+		std::cerr << exc.what();
 		aiFreeScene(scenecopy_tmp);
 		throw;
 	}

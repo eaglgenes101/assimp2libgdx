@@ -27,7 +27,7 @@ set (EXTRA_LIBS ${EXTRA_LIBS} assimp)
 
 include_directories("assimp/include")
 
-add_executable(assimp2libgdx assimp2libgdx/main.cpp assimp2libgdx/json_exporter.cpp assimp2libgdx/cencode.c assimp2libgdx/mesh_splitter.h assimp2libgdx/mesh_splitter.cpp)
+add_executable(assimp2libgdx assimp2libgdx/main.cpp assimp2libgdx/json_exporter.cpp assimp2libgdx/mesh_splitter.h assimp2libgdx/mesh_splitter.cpp)
 target_link_libraries (assimp2libgdx ${EXTRA_LIBS})
 
 if( MSVC_IDE )

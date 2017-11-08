@@ -1,11 +1,11 @@
 assimp2libgdx
 ========
 
-This project was forked from [assimp2json](https://github.com/acgessler/assimp2json/) rather messily, hence some commits before the start of my project, and some files here or there referring to the project as assimp2json. It is heavily based on it, but it ultimately has a different purpose, hence why I say it's a derivative rather than a fork. 
+This project was derived from [assimp2json](https://github.com/acgessler/assimp2json/) rather messily, hence some commits before the start of my project, and some files here or there referring to the project as assimp2json. It is heavily based on it, but it ultimately has a different purpose, hence why I say it's a derivative rather than a fork. 
 
 ### Status ###
 
-Right now, the project successfully generates json files based on the input. Whether they actually are valid g3dj files is another question entirely. 
+Right now, the project successfully generates json files based on the input. Whether they actually are valid g3dj files is another question entirely. I'm on my way to make sure that the files are acutal g3dj files, but until then, I can make no promises that your converted models won't turn real and try to eat you. 
 
 Only a subset of assimp features are currently translated to g3d json files. This will be lifted as the project goes on. 
 

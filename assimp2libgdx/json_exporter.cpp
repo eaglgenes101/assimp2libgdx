@@ -228,26 +228,6 @@ private:
 		return stream;
 	}
 
-	/*
-	std::stringstream& LiteralToString(std::stringstream& stream, const aiString& s) {
-		std::string t;
-		// escape backslashes and single quotes, both would render the JSON invalid if left as is
-		//t.reserve(s.length); //BZZZZZT
-		for(size_t i = 0; i < s.length; ++i) {
-			
-			if (s.data[i] == '\\' || s.data[i] == '\'' || s.data[i] == '\"') {
-				t.push_back('\\');
-			}
-
-			t.push_back(s.data[i]);
-		}
-		stream << "\"";
-		stream << t;
-		stream << "\"";
-		return stream;
-	}
-	*/
-
 	std::stringstream& LiteralToString(std::stringstream& stream, const float& f) {
 		if (!std::numeric_limits<float>::is_iec559) {
 			// on a non IEEE-754 platform, we make no assumptions about the representation or existence
@@ -255,7 +235,6 @@ private:
 			stream << f;
 			return stream;
 		}
-		/*
 		// JSON does not support writing Inf/Nan
 		// [RFC 4672: "Numeric values that cannot be represented as sequences of digits
 		// (such as Infinity and NaN) are not permitted."]
@@ -281,7 +260,6 @@ private:
 			stream << "0.0";
 			return stream;
 		}
-		*/
 		stream << f;
 		return stream;
 	}
@@ -470,15 +448,13 @@ void WriteAsPart(JSONWriter& out, const aiMesh& ai, int id)
 	if (ai.HasBones()) {
 		assert(ai.mNumBones > 0);
 		assert(ai.mBones != nullptr);
-		//For w/e reason, I can't do the double indirection of aiMesh to aiBone
-		//The below line segfaults, even though it should be valid if bones exist in the mesh
 		//assert(*ai.mBones != nullptr); 
 		
 		//TODO: Figure out how to access bones without segfaulting
 		out.Key("bones");
 		out.StartArray();
 		for (unsigned int i = 0; i < ai.mNumBones; ++i) {
-			//Write(out, *ai.mBones[i] ); //According to what I can gather, this should do the trick
+			Write(out, *ai.mBones[i] ); //Why does this segfault
 		}
 		out.EndArray();
 	}
@@ -489,22 +465,24 @@ void WriteAsPart(JSONWriter& out, const aiMesh& ai, int id)
 		out.StartArray();
 		for (unsigned int channel = 0; channel < ai.GetNumUVChannels(); ++channel) {
 			out.StartArray();
-			for (unsigned int component = 0; component < ai.mNumUVComponents[channel]; ++component) {
+			unsigned int components = ai.mNumUVComponents[channel] ? ai.mNumUVComponents[channel] : 2;
+			for (unsigned int vertex = 0; vertex < ai.mNumVertices; ++vertex) {
 				//The spec isn't entirely clear, so this is my best guess
 				//It spills the vector coordinates into one homogenous array
-				//Write(out, ai.mTextureCoords[channel][component]); 
+				for (unsigned int c = 0; c < components; ++c) {
+					out.SimpleValue(ai.mTextureCoords[channel][vertex][c]); 
+				}
 			}
 			out.EndArray();
 		}
 		out.EndArray();
 		
 	}
-
 	out.EndObj();
 }
 
 //Recursive function, so we iterate through all nodes
-void Write(JSONWriter& out, const aiNode& ai, aiMesh* meshes)
+void Write(JSONWriter& out, const aiNode& ai, aiMesh* meshes, int numMeshes)
 {
 	out.StartObj();
 
@@ -537,7 +515,8 @@ void Write(JSONWriter& out, const aiNode& ai, aiMesh* meshes)
 		out.Key("parts");
 		out.StartArray();
 		for(unsigned int n = 0; n < ai.mNumMeshes; ++n) {
-			WriteAsPart(out, meshes[ai.mMeshes[n]], n);
+			assert(ai.mMeshes[n] < numMeshes);
+			WriteAsPart(out, meshes[ai.mMeshes[n]], n); //?
 		}
 		out.EndArray();
 	}
@@ -546,7 +525,7 @@ void Write(JSONWriter& out, const aiNode& ai, aiMesh* meshes)
 	//As said, recursion
 	if(ai.mNumChildren) {
 		for(unsigned int n = 0; n < ai.mNumChildren; ++n) {
-			Write(out,*ai.mChildren[n],meshes);
+			Write(out,*ai.mChildren[n],meshes,numMeshes);
 		}
 	}
 }
@@ -906,7 +885,7 @@ void Write(JSONWriter& out, const aiScene& ai)
 		
 	out.Key("nodes");
 	out.StartArray();
-	Write(out,*ai.mRootNode,*ai.mMeshes);
+	Write(out,*ai.mRootNode,*ai.mMeshes, ai.mNumMeshes);
 	out.EndArray();
 
 	if(ai.HasAnimations()) {
@@ -932,9 +911,9 @@ void Assimp2Libgdx(const char* file, Assimp::IOSystem* io, const aiScene* scene,
 	aiCopyScene(scene, &scenecopy_tmp);
 
 	try {
-		// split meshes so they fit into a 16 bit index buffer
+		// split meshes so they fit into a 16 bit signed index buffer
 		MeshSplitter splitter;
-		splitter.SetLimit(1 << 16);
+		splitter.SetLimit(1 << 15);
 		splitter.Execute(scenecopy_tmp);
 		
 		// XXX Flag_WriteSpecialFloats is turned on by default, right now we don't have a configuration interface for exporters

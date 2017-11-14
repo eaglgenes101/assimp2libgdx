@@ -298,7 +298,7 @@ void Write(JSONWriter& out, const aiColor4D& ai)
 	out.SimpleValue(ai.r);
 	out.SimpleValue(ai.g);
 	out.SimpleValue(ai.b);
-	out.SimpleValue(ai.a);
+	//out.SimpleValue(ai.a);
 }
 
 void Write(JSONWriter& out, const aiBone& ai)
@@ -348,14 +348,14 @@ void Write(JSONWriter& out, const aiFace& ai)
 template <typename Literal>
 void WriteAttribute(JSONWriter& out, const Literal& usage, int size, std::string type = "FLOAT")
 {
-	out.StartObj();
-	out.Key("usage");
+	//out.StartObj();
+	//out.Key("usage");
 	out.SimpleValue(usage);
-	out.Key("size");
-	out.SimpleValue(size);
-	out.Key("type");
-	out.SimpleValue(type);
-	out.EndObj();
+	//out.Key("size");
+	//out.SimpleValue(size);
+	//out.Key("type");
+	//out.SimpleValue(type);
+	//out.EndObj();
 }
 
 //For meshes
@@ -395,7 +395,7 @@ void Write(JSONWriter& out, const aiMesh& ai)
 		if (writeNormals) Write(out, ai.mNormals[i]);
 		if (ai.GetNumColorChannels()) {
 			for (unsigned int j = 0; j < ai.GetNumColorChannels(); ++j) {
-				if (writeColors) Write(out, ai.mColors[j][i]); //TODO: fix this up
+				if (writeColors) Write(out, ai.mColors[j][i]); //I... think? 
 			}
 		}
 		if (writeTangents) {
@@ -427,6 +427,7 @@ void Write(JSONWriter& out, const aiMesh& ai)
 			default:
 				out.SimpleValue("TRIANGLE_STRIP");
 				break;
+			//TODO: Figure out how to get the wireframe attribute from down here
 		}
 		out.Key("indices");
 		Write(out, ai.mFaces[i]);
@@ -486,7 +487,7 @@ void Write(JSONWriter& out, const aiNode& ai, aiMesh* meshes, int numMeshes)
 {
 	out.StartObj();
 
-	out.Key("name");
+	out.Key("id");
 	out.SimpleValue(ai.mName.C_Str());
 	
 	aiMatrix4x4 transform = ai.mTransformation;
@@ -554,7 +555,8 @@ std::array<aiString*, 4> Write(JSONWriter& out, const aiMaterial& ai, int d)
 		//the macros weren't just string literals
 		//Don't do unhygenic macros, kids
 		if (!strcmp(prop->mKey.C_Str(), "$clr.diffuse")) {
-			out.Key("diffuseColor");
+			//out.Key("diffuseColor");
+			out.Key("diffuse");
 			out.StartArray();
 			for(unsigned int i = 0; i < prop->mDataLength/sizeof(float); ++i) {
 				out.SimpleValue(reinterpret_cast<float*>(prop->mData)[i]);
@@ -563,7 +565,8 @@ std::array<aiString*, 4> Write(JSONWriter& out, const aiMaterial& ai, int d)
 			break;
 		}
 		else if (!strcmp(prop->mKey.C_Str(), "$clr.specular")) {
-			out.Key("specularColor");
+			//out.Key("specularColor");
+			out.Key("specular");
 			out.StartArray();
 			for(unsigned int i = 0; i < prop->mDataLength/sizeof(float); ++i) {
 				out.SimpleValue(reinterpret_cast<float*>(prop->mData)[i]);
@@ -572,7 +575,8 @@ std::array<aiString*, 4> Write(JSONWriter& out, const aiMaterial& ai, int d)
 			break;
 		}
 		else if (!strcmp(prop->mKey.C_Str(), "$clr.ambient")) {
-			out.Key("ambientColor");
+			//out.Key("ambientColor");
+			out.Key("ambient");
 			out.StartArray();
 			for(unsigned int i = 0; i < prop->mDataLength/sizeof(float); ++i) {
 				out.SimpleValue(reinterpret_cast<float*>(prop->mData)[i]);
@@ -581,7 +585,8 @@ std::array<aiString*, 4> Write(JSONWriter& out, const aiMaterial& ai, int d)
 			break;
 		}
 		else if (!strcmp(prop->mKey.C_Str(), "$clr.emissive")) {
-			out.Key("emissiveColor");
+			//out.Key("emissiveColor");
+			out.Key("emissive");
 			out.StartArray();
 			for(unsigned int i = 0; i < prop->mDataLength/sizeof(float); ++i) {
 				out.SimpleValue(reinterpret_cast<float*>(prop->mData)[i]);
@@ -589,6 +594,7 @@ std::array<aiString*, 4> Write(JSONWriter& out, const aiMaterial& ai, int d)
 			out.EndArray();
 			break;
 		}
+		/*
 		else if (!strcmp(prop->mKey.C_Str(), "$mat.twosided")) {
 			out.Key("cullface");
 			bool keepBack = *reinterpret_cast<bool*>(prop->mData);
@@ -596,6 +602,8 @@ std::array<aiString*, 4> Write(JSONWriter& out, const aiMaterial& ai, int d)
 			else out.SimpleValue("BACK");
 			break;
 		}
+		*/
+		/*
 		else if (!strcmp(prop->mKey.C_Str(), "$mat.blend")) {
 			//Modify blend
 			doBlend = true;
@@ -611,9 +619,15 @@ std::array<aiString*, 4> Write(JSONWriter& out, const aiMaterial& ai, int d)
 			}	
 			break;
 		}
+		*/
 		else if (!strcmp(prop->mKey.C_Str(), "$mat.opacity")) {
+			/*
 			doBlend = true;
 			opacity = *reinterpret_cast<float*>(prop->mData);
+			break;
+			*/
+			out.Key("opacity");
+			out.SimpleValue(*reinterpret_cast<float*>(prop->mData));
 			break;
 		}
 		else if (!strcmp(prop->mKey.C_Str(), "$mat.shininess")) {
@@ -665,6 +679,7 @@ std::array<aiString*, 4> Write(JSONWriter& out, const aiMaterial& ai, int d)
 			}
 		}
 	}
+	/*
 	if (doBlend)
 	{
 		out.Key("blended");
@@ -683,42 +698,87 @@ std::array<aiString*, 4> Write(JSONWriter& out, const aiMaterial& ai, int d)
 		}
 		out.EndObj();
 	}
+	*/
+	out.Key("textures");
+	out.StartArray();
 	if (diffuseDepth >= 0)
 	{
+		out.StartObj();
+		out.Key("id");
+		out.SimpleValue(std::to_string(d)+std::string(".diffuse"));
+		out.Key("filename");
+		out.SimpleValue(diffusePath->C_Str());
+		out.Key("type");
+		out.SimpleValue("DIFFUSE");
+		//TODO: Figure out how in the world we get at texture transllation and scaling
+		out.EndObj();
+		/*
 		out.Key("diffuseTexture");
 		assert(diffusePath != nullptr);
 		out.SimpleValue(diffusePath->C_Str());
+		*/
 		val[0] = diffusePath;
 	}
 	else
 		val[0] = nullptr;
 	if (specularDepth >= 0)
 	{
+		out.StartObj();
+		out.Key("id");
+		out.SimpleValue(std::to_string(d)+std::string(".specular"));
+		out.Key("filename");
+		out.SimpleValue(diffusePath->C_Str());
+		out.Key("type");
+		out.SimpleValue("SPECULAR");
+		//TODO: Figure out how in the world we get at texture transllation and scaling
+		/*
 		out.Key("specularTexture");
 		assert(specularPath != nullptr);
 		out.SimpleValue(specularPath->C_Str());
+		*/
 		val[1] = specularPath;
 	}
 	else
 		val[1] = nullptr;
 	if (bumpDepth >= 0)
 	{
+		out.StartObj();
+		out.Key("id");
+		out.SimpleValue(std::to_string(d)+std::string(".bump"));
+		out.Key("filename");
+		out.SimpleValue(diffusePath->C_Str());
+		out.Key("type");
+		out.SimpleValue("BUMP");
+		//TODO: Figure out how in the world we get at texture transllation and scaling
+		/*
 		out.Key("bumpTexture");
 		assert(bumpPath != nullptr);
 		out.SimpleValue(bumpPath->C_Str());
+		*/
 		val[2] = bumpPath;
 	}
 	else
 		val[2] = nullptr;
 	if (normalDepth >= 0)
 	{
+		out.StartObj();
+		out.Key("id");
+		out.SimpleValue(std::to_string(d)+std::string(".normal"));
+		out.Key("filename");
+		out.SimpleValue(diffusePath->C_Str());
+		out.Key("type");
+		out.SimpleValue("NORMAL");
+		//TODO: Figure out how in the world we get at texture transllation and scaling
+		/*
 		out.Key("normalTexture");
 		assert(normalPath != nullptr);
 		out.SimpleValue(normalPath->C_Str());
+		*/
 		val[3] = normalPath;
 	}
 	else
 		val[3] = nullptr;
+	out.EndArray();
 	return {val[0], val[1], val[2], val[3]};
 }
 
@@ -726,7 +786,7 @@ void Write(JSONWriter& out, const aiNodeAnim& ai)
 {
 	out.StartObj();
 	
-	out.Key("node");
+	out.Key("boneid");
 	out.SimpleValue(ai.mNodeName.C_Str());
 	
 	std::map<float, aiVector3D> posKeys;
@@ -816,7 +876,7 @@ void Write(JSONWriter& out, const aiAnimation& ai)
 	
 	if (ai.mNumChannels > 0)
 	{
-		out.Key("nodes");
+		out.Key("bones");
 		out.StartArray();
 		for(unsigned int n = 0; n < ai.mNumChannels; ++n) {
 			Write(out,*ai.mChannels[n]);
@@ -830,7 +890,7 @@ void WriteVersionInfo(JSONWriter& out)
 {
 	out.StartArray();
 	out.SimpleValue("0");
-	out.SimpleValue("3"); //Specification this converter is based on
+	out.SimpleValue("1"); //Specification this converter is based on
 	out.EndArray();
 }
 
@@ -866,7 +926,8 @@ void Write(JSONWriter& out, const aiScene& ai)
 			out.EndObj();
 		}
 		out.EndArray();
-		
+		// Not until version 0.3 can be loaded into libgdx
+		/*
 		out.Key("texture");
 		out.StartArray();
 		std::set<aiString*>::iterator iter = materialNames.begin();
@@ -881,6 +942,7 @@ void Write(JSONWriter& out, const aiScene& ai)
 			out.SimpleValue(str->C_Str());
 		}
 		out.EndArray();
+		*/
 	}
 		
 	out.Key("nodes");

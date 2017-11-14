@@ -1,5 +1,4 @@
 buildscript {
-    
 
     repositories {
         mavenLocal()
@@ -8,7 +7,6 @@ buildscript {
         jcenter()
     }
     dependencies {
-        
 
     }
 }
@@ -20,11 +18,7 @@ allprojects {
     version = '1.0'
     ext {
         appName = "assimp2libgdx-model-viewer"
-        gdxVersion = '1.9.7'
-        roboVMVersion = '2.3.1'
-        box2DLightsVersion = '1.4'
-        ashleyVersion = '1.7.0'
-        aiVersion = '1.8.0'
+        gdxVersion = '1.9.6'
     }
 
     repositories {
@@ -43,19 +37,14 @@ project(":desktop") {
         compile project(":core")
         compile "com.badlogicgames.gdx:gdx-backend-lwjgl:$gdxVersion"
         compile "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-desktop"
-        compile "com.badlogicgames.gdx:gdx-box2d-platform:$gdxVersion:natives-desktop"
-        
     }
 }
 
 project(":core") {
     apply plugin: "java"
 
-
     dependencies {
         compile "com.badlogicgames.gdx:gdx:$gdxVersion"
-        compile "com.badlogicgames.gdx:gdx-box2d:$gdxVersion"
-        
     }
 }
 

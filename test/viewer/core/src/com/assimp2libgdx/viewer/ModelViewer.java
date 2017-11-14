@@ -19,7 +19,7 @@ package com.assimp2libgdx.viewer;
 import com.badlogic.gdx.ApplicationListener;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.assets.AssetManager;
-import com.badlogic.gdx.graphics.GL20;
+import com.badlogic.gdx.graphics.GL30;
 import com.badlogic.gdx.graphics.PerspectiveCamera;
 import com.badlogic.gdx.graphics.g3d.Environment;
 import com.badlogic.gdx.graphics.g3d.Model;
@@ -67,7 +67,7 @@ public class ModelViewer implements ApplicationListener
 		camController = new CameraInputController(cam);
 		Gdx.input.setInputProcessor(camController);
 		
-		assets = new AssetManager();
+		assets = new AssetManager(new ViewerFileHandleResolver());
 		assets.load(path, Model.class);
 		loading = true;
 	}
@@ -91,7 +91,7 @@ public class ModelViewer implements ApplicationListener
 		camController.update();
 		
 		Gdx.gl.glViewport(0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
-		Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT | GL20.GL_DEPTH_BUFFER_BIT);
+		Gdx.gl.glClear(GL30.GL_COLOR_BUFFER_BIT | GL30.GL_DEPTH_BUFFER_BIT);
 		
 		modelBatch.begin(cam);
 		modelBatch.render(instances, environment);

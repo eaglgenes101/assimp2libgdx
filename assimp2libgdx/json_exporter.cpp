@@ -24,6 +24,7 @@ Licensed under a 3-clause BSD license. See the LICENSE file for more information
 #include <limits>
 #include <cassert>
 #include <cstring>
+#include <climits>
 #include <set>
 
 #define CURRENT_FORMAT_VERSION 03
@@ -298,7 +299,7 @@ void Write(JSONWriter& out, const aiColor4D& ai)
 	out.SimpleValue(ai.r);
 	out.SimpleValue(ai.g);
 	out.SimpleValue(ai.b);
-	//out.SimpleValue(ai.a);
+	out.SimpleValue(ai.a);
 }
 
 void Write(JSONWriter& out, const aiBone& ai)
@@ -335,7 +336,6 @@ void Write(JSONWriter& out, const aiBone& ai)
 	out.EndObj();
 }
 
-
 void Write(JSONWriter& out, const aiFace& ai)
 {
 	out.StartArray();
@@ -367,6 +367,7 @@ void Write(JSONWriter& out, const aiMesh& ai)
 	bool writeNormals = false;
 	bool writeColors = false;
 	bool writeTangents = false; 
+	int writeTexCoords = 0;
 	out.Key("attributes");
 	out.StartArray();
 	if (ai.HasPositions()) {
@@ -386,6 +387,10 @@ void Write(JSONWriter& out, const aiMesh& ai)
 		WriteAttribute(out, "TANGENT", 3);
 		WriteAttribute(out, "BINORMAL", 3);
 	}
+	writeTexCoords = ai.GetNumUVChannels()>8?8:ai.GetNumUVChannels();
+	for (unsigned int i = 0; i < writeTexCoords; ++i) {
+		WriteAttribute(out, std::string("TEXCOORD")+std::to_string(i), ai.GetNumUVChannels()*2);
+	}
 	out.EndArray();
 	
 	out.Key("vertices");
@@ -393,14 +398,20 @@ void Write(JSONWriter& out, const aiMesh& ai)
 	for (unsigned int i = 0; i < ai.mNumVertices; ++i) {
 		if (writePositions) Write(out, ai.mVertices[i]);
 		if (writeNormals) Write(out, ai.mNormals[i]);
-		if (ai.GetNumColorChannels()) {
+		if (writeColors && ai.mColors != nullptr) {
 			for (unsigned int j = 0; j < ai.GetNumColorChannels(); ++j) {
-				if (writeColors) Write(out, ai.mColors[j][i]); //I... think? 
+				Write(out, ai.mColors[j][i]); //I... think? 
 			}
 		}
 		if (writeTangents) {
 			Write(out, ai.mTangents[i]);
 			Write(out, ai.mBitangents[i]);
+		}
+		if (writeTexCoords && ai.mTextureCoords != nullptr) {
+			for (unsigned int j = 0; j < ai.GetNumUVChannels(); ++j) {
+				out.SimpleValue(ai.mTextureCoords[j][i].x);
+				out.SimpleValue(ai.mTextureCoords[j][i].y);
+			}
 		}
 	}
 	out.EndArray();
@@ -445,7 +456,7 @@ void WriteAsPart(JSONWriter& out, const aiMesh& ai, int id)
 	//Name takes the form <meshName> "." <faceNum>
 	out.SimpleValue(std::string(ai.mName.C_Str())+std::string(".")+std::to_string(id));
 	out.Key("materialid");
-	out.SimpleValue(ai.mMaterialIndex);
+	out.SimpleValue(std::to_string(ai.mMaterialIndex));
 	if (ai.HasBones()) {
 		assert(ai.mNumBones > 0);
 		assert(ai.mBones != nullptr);
@@ -541,16 +552,17 @@ std::array<aiString*, 4> Write(JSONWriter& out, const aiMaterial& ai, int d)
 	float opacity = 1.0;
 	const char* srcBlend = nullptr;
 	const char* destBlend = nullptr;
-	int diffuseDepth = -1;
+	long diffuseDepth = LONG_MIN;
 	aiString* diffusePath = nullptr;
-	int specularDepth = -1;
+	long specularDepth = LONG_MIN;
 	aiString* specularPath = nullptr;
-	int bumpDepth = -1;
+	long bumpDepth = LONG_MIN;
 	aiString* bumpPath = nullptr;
-	int normalDepth = -1;
+	long normalDepth = LONG_MIN;
 	aiString* normalPath = nullptr;
 	for (unsigned int i = 0; i < ai.mNumProperties; i++) {
 		const aiMaterialProperty* prop = ai.mProperties[i];
+		std::cout << std::string(prop->mKey.C_Str()) << std::endl;
 		//Took me forever to figure out what was going on before finding that 
 		//the macros weren't just string literals
 		//Don't do unhygenic macros, kids
@@ -558,7 +570,7 @@ std::array<aiString*, 4> Write(JSONWriter& out, const aiMaterial& ai, int d)
 			//out.Key("diffuseColor");
 			out.Key("diffuse");
 			out.StartArray();
-			for(unsigned int i = 0; i < prop->mDataLength/sizeof(float); ++i) {
+			for(unsigned int i = 0; i < 3; ++i) {
 				out.SimpleValue(reinterpret_cast<float*>(prop->mData)[i]);
 			}
 			out.EndArray();
@@ -568,7 +580,7 @@ std::array<aiString*, 4> Write(JSONWriter& out, const aiMaterial& ai, int d)
 			//out.Key("specularColor");
 			out.Key("specular");
 			out.StartArray();
-			for(unsigned int i = 0; i < prop->mDataLength/sizeof(float); ++i) {
+			for(unsigned int i = 0; i < 3; ++i) {
 				out.SimpleValue(reinterpret_cast<float*>(prop->mData)[i]);
 			}
 			out.EndArray();
@@ -578,7 +590,7 @@ std::array<aiString*, 4> Write(JSONWriter& out, const aiMaterial& ai, int d)
 			//out.Key("ambientColor");
 			out.Key("ambient");
 			out.StartArray();
-			for(unsigned int i = 0; i < prop->mDataLength/sizeof(float); ++i) {
+			for(unsigned int i = 0; i < 3; ++i) {
 				out.SimpleValue(reinterpret_cast<float*>(prop->mData)[i]);
 			}
 			out.EndArray();
@@ -588,7 +600,7 @@ std::array<aiString*, 4> Write(JSONWriter& out, const aiMaterial& ai, int d)
 			//out.Key("emissiveColor");
 			out.Key("emissive");
 			out.StartArray();
-			for(unsigned int i = 0; i < prop->mDataLength/sizeof(float); ++i) {
+			for(unsigned int i = 0; i < 3; ++i) {
 				out.SimpleValue(reinterpret_cast<float*>(prop->mData)[i]);
 			}
 			out.EndArray();
@@ -620,7 +632,7 @@ std::array<aiString*, 4> Write(JSONWriter& out, const aiMaterial& ai, int d)
 			break;
 		}
 		*/
-		else if (!strcmp(prop->mKey.C_Str(), "$mat.opacity")) {
+		if (!strcmp(prop->mKey.C_Str(), "$mat.opacity")) {
 			/*
 			doBlend = true;
 			opacity = *reinterpret_cast<float*>(prop->mData);
@@ -889,8 +901,8 @@ void Write(JSONWriter& out, const aiAnimation& ai)
 void WriteVersionInfo(JSONWriter& out)
 {
 	out.StartArray();
-	out.SimpleValue("0");
-	out.SimpleValue("1"); //Specification this converter is based on
+	out.SimpleValue(0);
+	out.SimpleValue(1); //Specification this converter is based on
 	out.EndArray();
 }
 
